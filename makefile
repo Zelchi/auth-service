@@ -1,8 +1,8 @@
 dev: 
-	air run -c .air.toml
+	cd backend && air run -c .air.toml
 coverage:
-	go test ./...
+	cd backend && go test ./...
 build:
-	go build -o ./bin ./cmd/main.go
+	cd backend && go build -o ./bin ./cmd/main.go
 start: 
-	go run ./cmd/main.go
+	cd backend && go run ./cmd/main.go

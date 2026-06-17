@@ -1,0 +1,20 @@
+services:
+    auth:
+        build:
+            context: .
+            dockerfile: dockerfile
+        container_name: auth-service
+        restart: unless-stopped
+        ports:
+            - "8123:8888"
+        environment:
+            SERVER_PORT: "8888"
+            JWT_SECRET: ${JWT_SECRET}
+            RESEND_API_KEY: ${RESEND_API_KEY}
+            RESEND_FROM: ${RESEND_FROM}
+            DB_URL: /data/auth.sqlite
+        volumes:
+            - auth_data:/data
+
+volumes:
+    auth_data:

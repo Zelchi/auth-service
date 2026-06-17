@@ -5,7 +5,9 @@ import (
 	"authentication/core/handler"
 	"authentication/core/middleware"
 	"context"
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -15,6 +17,9 @@ import (
 
 	"github.com/joho/godotenv"
 )
+
+//go:embed dist
+var frontend embed.FS
 
 type responseWriter struct {
 	http.ResponseWriter
@@ -29,16 +34,12 @@ func (rw *responseWriter) WriteHeader(status int) {
 func console(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
-
 		log.Printf("→ %s %s", r.Method, r.URL.Path)
 
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rw, r)
 
-		duration := time.Since(now)
-		log.Printf("← %s %s %d (%s)",
-			r.Method, r.URL.Path, rw.status, duration,
-		)
+		log.Printf("← %s %s %d (%s)", r.Method, r.URL.Path, rw.status, time.Since(now))
 	})
 }
 
@@ -51,10 +52,25 @@ func main() {
 	defer database.DB.Close()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/register", handler.Register)
-	mux.HandleFunc("/verify", handler.Verify)
-	mux.HandleFunc("/login", handler.Login)
-	mux.HandleFunc("/me", middleware.Auth(handler.Me))
+
+	mux.HandleFunc("/api/register", handler.Register)
+	mux.HandleFunc("/api/verify", handler.Verify)
+	mux.HandleFunc("/api/login", handler.Login)
+	mux.HandleFunc("/api/me", middleware.Auth(handler.Me))
+
+	stripped, err := fs.Sub(frontend, "dist")
+	if err != nil {
+		log.Fatalf("erro ao preparar assets: %v", err)
+	}
+	fileServer := http.FileServer(http.FS(stripped))
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, statErr := fs.Stat(stripped, r.URL.Path[1:])
+		if r.URL.Path != "/" && statErr != nil {
+			r.URL.Path = "/"
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {

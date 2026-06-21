@@ -1,8 +1,5 @@
 .PHONY: dev build start coverage docker up down
 
-coverage:
-	cd backend && go test -v -cover ./...
-
 build:
 	cd frontend && yarn build
 	rm -rf backend/cmd/dist

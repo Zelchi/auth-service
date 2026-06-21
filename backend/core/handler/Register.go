@@ -3,13 +3,12 @@ package handler
 import (
 	"authentication/core/database"
 	"authentication/core/email"
+	"authentication/core/pending"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -19,16 +18,13 @@ type registerRequest struct {
 }
 
 func Register(w http.ResponseWriter, r *http.Request) {
-	var err error
-	var hash []byte
-
 	if r.Method != http.MethodPost {
 		http.Error(w, "método não permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req registerRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body inválido"})
 		return
 	}
@@ -43,25 +39,16 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err = bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao processar senha"})
+	var exists int
+	err := database.DB.QueryRow(`SELECT 1 FROM users WHERE email = ?`, req.Email).Scan(&exists)
+	if err == nil {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "email já cadastrado"})
 		return
 	}
 
-	userID := uuid.New().String()
-
-	_, err = database.DB.Exec(
-		`INSERT INTO users (id, email, password) VALUES (?, ?, ?)`,
-		userID, req.Email, string(hash),
-	)
-
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "unique") {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "email já cadastrado"})
-			return
-		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao salvar usuário"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao processar senha"})
 		return
 	}
 
@@ -71,25 +58,17 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	codeID := uuid.New().String()
-	expiresAt := time.Now().UTC().Add(15 * time.Minute)
-
-	if _, err = database.DB.Exec(
-		`INSERT INTO verification_codes (id, user_id, code, expires_at) VALUES (?, ?, ?, ?)`,
-		codeID, userID, code, expiresAt,
-	); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao salvar código"})
-		return
-	}
-
 	if err := email.SendVerificationCode(req.Email, code); err != nil {
-		fmt.Printf("aviso: erro ao enviar email para %s: %v\n", req.Email, err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao enviar email de verificação"})
+		fmt.Printf("erro ao enviar email para %s: %v\n", req.Email, err)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"error": "não foi possível enviar o email de verificação, tente novamente",
+		})
 		return
 	}
+
+	pending.Put(req.Email, string(hash), code)
 
 	writeJSON(w, http.StatusCreated, map[string]string{
-		"message": "conta criada! verifique seu email para ativar.",
-		"user_id": userID,
+		"message": "código enviado! verifique seu email para ativar a conta.",
 	})
 }

@@ -2,7 +2,12 @@ import { styled } from 'solid-styled-components'
 
 export const Button = styled('button') <{ loading?: boolean }>`
     width: 100%;
-    padding: 13px;
+    height: 40px;
+    margin-top: 12px;
+    padding-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--accent);
     color: var(--bg);
     border: none;
@@ -15,11 +20,9 @@ export const Button = styled('button') <{ loading?: boolean }>`
     transition: background 0.15s, opacity 0.15s;
     opacity: ${p => p.loading ? '0.6' : '1'};
     pointer-events: ${p => p.loading ? 'none' : 'auto'};
-
     &:hover {
         background: var(--accent-hover);
     }
-
     @media (prefers-color-scheme: light) {
         color: #fff;
     }
@@ -70,6 +73,5 @@ export const TextLink = styled('button')`
     padding: 0;
     text-decoration: underline;
     text-underline-offset: 3px;
-
     &:hover { color: var(--accent-hover); }
 `

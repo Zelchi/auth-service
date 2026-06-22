@@ -50,7 +50,7 @@ func Verify(w http.ResponseWriter, r *http.Request) {
 
 	userID := uuid.New().String()
 	_, err := database.DB.Exec(
-		`INSERT INTO users (id, email, password, verified) VALUES (?, ?, ?, 1)`,
+		`INSERT INTO users (id, email, password) VALUES (?, ?, ?)`,
 		userID, reg.Email, reg.PasswordHash,
 	)
 	if err != nil {

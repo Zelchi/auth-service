@@ -6,7 +6,7 @@ build:
 	cp -r frontend/dist backend/cmd/dist
 	cd backend && go build -ldflags="-s -w" -o ./bin/server ./cmd/main.go
 
-start:
+start: build
 	cd backend && go run ./cmd/main.go
 
 docker:

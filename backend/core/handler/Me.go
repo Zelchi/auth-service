@@ -16,13 +16,12 @@ func Me(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.UserIDKey).(string)
 
 	var id, email string
-	var verified bool
 	var createdAt time.Time
 
 	err := database.DB.QueryRow(
-		`SELECT id, email, verified, created_at FROM users WHERE id = ?`,
+		`SELECT id, email, created_at FROM users WHERE id = ?`,
 		userID,
-	).Scan(&id, &email, &verified, &createdAt)
+	).Scan(&id, &email, &createdAt)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "usuário não encontrado"})
 		return
@@ -31,7 +30,6 @@ func Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":         id,
 		"email":      email,
-		"verified":   verified,
 		"created_at": createdAt,
 	})
 }

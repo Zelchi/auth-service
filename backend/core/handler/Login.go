@@ -30,11 +30,10 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 
 	var userID, hash string
-	var verified bool
 	err := database.DB.QueryRow(
-		`SELECT id, password, verified FROM users WHERE email = ?`,
+		`SELECT id, password FROM users WHERE email = ?`,
 		req.Email,
-	).Scan(&userID, &hash, &verified)
+	).Scan(&userID, &hash)
 	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "credenciais inválidas"})
 		return
@@ -42,11 +41,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	if err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "credenciais inválidas"})
-		return
-	}
-
-	if !verified {
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": "conta não verificada. cheque seu email."})
 		return
 	}
 

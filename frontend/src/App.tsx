@@ -2,7 +2,8 @@ import { Router, Route } from "@solidjs/router";
 import { lazy, onCleanup } from 'solid-js'
 import Cookies from 'js-cookie'
 import API from './api/client'
-import { installAuthMessageBridge } from './auth-message-bridge'
+
+import { installBridge } from './scripts/bridge'
 
 const Register = lazy(() => import('./components/Register'))
 const Verify = lazy(() => import('./components/Verify'))
@@ -10,10 +11,6 @@ const Login = lazy(() => import('./components/Login'))
 const Dashboard = lazy(() => import('./components/Dashboard'))
 
 type Screen = 'login' | 'register' | 'verify' | 'dashboard'
-
-window.authService = Object.freeze({
-    getToken: () => Cookies.get('auth-token'),
-})
 
 const verifyPeriod = (old: number): boolean => {
     const period = 15 * 60 * 1000;
@@ -75,8 +72,7 @@ const redirect = (screen: Screen) => {
 }
 
 export default () => {
-    onCleanup(installAuthMessageBridge())
-
+    onCleanup(installBridge())
     return (
         <Router>
             <Route

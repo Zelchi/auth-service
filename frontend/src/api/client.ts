@@ -37,5 +37,5 @@ export default {
         body: JSON.stringify({ email, password }),
     }),
 
-    me: () => request<{ id: string; email: string; verified: boolean; created_at: string }>('/me'),
+    me: () => request<{ id: string; email: string; created_at: string }>('/me'),
 }

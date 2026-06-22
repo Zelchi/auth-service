@@ -1,9 +1,10 @@
-import { createSignal } from 'solid-js'
+import { createSignal, onMount } from 'solid-js'
 import { Button, Card, Center, Title, Subtitle } from '../styles'
 import Input from '../fragments/Input'
 import Alert from '../fragments/Alert'
 
 import API from '../api/client'
+import { Navigate } from '@solidjs/router'
 
 interface Props {
     email: string
@@ -15,6 +16,12 @@ export default (props: Props) => {
     const [loading, setLoading] = createSignal(false)
     const [error, setError] = createSignal('')
     const [success, setSuccess] = createSignal('')
+
+    onMount(() => {
+        if (!props.email) {
+            return <Navigate href="/login" />
+        }
+    })
 
     const submit = async () => {
         setError('')

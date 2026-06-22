@@ -63,17 +63,6 @@ const FieldValue = styled('span')`
     color: var(--text);
 `
 
-const Badge = styled('span') <{ verified: boolean }>`
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 99px;
-    font-size: 12px;
-    font-weight: 600;
-    background: ${p => p.verified ? 'rgba(46,204,113,0.12)' : 'rgba(192,57,43,0.12)'};
-    color: ${p => p.verified ? 'var(--success)' : 'var(--error)'};
-    border: 1px solid ${p => p.verified ? 'var(--success)' : 'var(--error)'};
-`
-
 interface Props {
     onLogout: () => void
 }
@@ -104,9 +93,6 @@ export default (props: Props) => {
                                 <span style={{ 'font-size': '16px', 'font-weight': '600', color: 'var(--text)' }}>
                                     Minha conta
                                 </span>
-                                <Badge verified={data().verified}>
-                                    {data().verified ? 'Verificado' : 'Não verificado'}
-                                </Badge>
                             </div>
                         </div>
 

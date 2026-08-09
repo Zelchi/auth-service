@@ -1,5 +1,3 @@
-.PHONY: dev build start coverage docker up down
-
 build:
 	cd frontend && yarn build
 	rm -rf backend/cmd/dist
@@ -9,11 +7,5 @@ build:
 start: build
 	cd backend && go run ./cmd/main.go
 
-docker:
-	docker build -t auth-service .
-
-up:
-	docker compose up -d --build
-
-down:
-	docker compose down
+clean:
+	rm -rf frontend/dist backend/cmd/dist backend/bin

@@ -3,11 +3,12 @@ package handler
 import (
 	"authentication/core/database"
 	"authentication/core/email"
+	"authentication/core/observability"
 	"authentication/core/pending"
-	"encoding/json"
-	"fmt"
+	"database/sql"
+	"errors"
+	"log/slog"
 	"net/http"
-	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -17,32 +18,39 @@ type registerRequest struct {
 	Password string `json:"password"`
 }
 
+var sendVerificationCode = email.SendVerificationCode
+
 func Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "método não permitido", http.StatusMethodNotAllowed)
+		methodNotAllowed(w)
 		return
 	}
 
 	var req registerRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body inválido"})
 		return
 	}
 
-	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-	if req.Email == "" || req.Password == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email e senha são obrigatórios"})
+	normalizedEmail, validEmail := normalizeEmail(req.Email)
+	if !validEmail || req.Password == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email e senha são obrigatórios e válidos"})
 		return
 	}
-	if len(req.Password) < 8 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "senha deve ter ao menos 8 caracteres"})
+	req.Email = normalizedEmail
+	if !validPassword(req.Password) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "senha deve ter entre 8 e 72 bytes"})
 		return
 	}
 
 	var exists int
-	err := database.DB.QueryRow(`SELECT 1 FROM users WHERE email = ?`, req.Email).Scan(&exists)
+	err := database.DB.QueryRowContext(r.Context(), `SELECT 1 FROM users WHERE email = ?`, req.Email).Scan(&exists)
 	if err == nil {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "email já cadastrado"})
+		return
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao consultar usuário"})
 		return
 	}
 
@@ -58,15 +66,20 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := email.SendVerificationCode(req.Email, code); err != nil {
-		fmt.Printf("erro ao enviar email para %s: %v\n", req.Email, err)
+	if err := pending.Put(r.Context(), req.Email, string(hash), digestVerificationCode(code)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao preparar verificação"})
+		return
+	}
+
+	if err := sendVerificationCode(r.Context(), req.Email, code); err != nil {
+		observability.IncVerificationEmailFailure()
+		slog.Error("verification_email_failed", "error", err)
+		_ = pending.Delete(r.Context(), req.Email)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 			"error": "não foi possível enviar o email de verificação, tente novamente",
 		})
 		return
 	}
-
-	pending.Put(req.Email, string(hash), code)
 
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"message": "código enviado! verifique seu email para ativar a conta.",

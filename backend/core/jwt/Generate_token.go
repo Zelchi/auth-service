@@ -1,17 +1,10 @@
 package jwt
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/json"
-	"os"
 	"time"
-)
 
-type jwtHeader struct {
-	Alg string `json:"alg"`
-	Typ string `json:"typ"`
-}
+	jwtv5 "github.com/golang-jwt/jwt/v5"
+)
 
 type JWTClaims struct {
 	Sub string `json:"sub"`
@@ -20,20 +13,28 @@ type JWTClaims struct {
 }
 
 func GenerateToken(userID string) (string, error) {
-	secret := os.Getenv("JWT_SECRET")
+	return generateToken(userID, 24*time.Hour)
+}
 
-	header, _ := json.Marshal(jwtHeader{Alg: "HS256", Typ: "JWT"})
-	claims, _ := json.Marshal(JWTClaims{
-		Sub: userID,
-		Iat: time.Now().Unix(),
-		Exp: time.Now().Add(24 * time.Hour).Unix(),
+// GenerateBridgeToken cria uma credencial curta para integrações autorizadas.
+// Ela não prolonga a sessão principal, que continua protegida pelo cookie.
+func GenerateBridgeToken(userID string) (string, error) {
+	return generateToken(userID, 5*time.Minute)
+}
+
+func generateToken(userID string, duration time.Duration) (string, error) {
+	secret, err := signingKey()
+	if err != nil {
+		return "", err
+	}
+
+	now := time.Now()
+	token := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, jwtv5.RegisteredClaims{
+		Subject:   userID,
+		IssuedAt:  jwtv5.NewNumericDate(now),
+		ExpiresAt: jwtv5.NewNumericDate(now.Add(duration)),
 	})
+	token.Header["typ"] = "JWT"
 
-	payload := b64(header) + "." + b64(claims)
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload))
-	sig := b64(mac.Sum(nil))
-
-	return payload + "." + sig, nil
+	return token.SignedString(secret)
 }

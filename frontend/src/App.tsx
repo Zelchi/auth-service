@@ -1,9 +1,9 @@
-import { Router, Route } from "@solidjs/router";
-import { lazy, onCleanup } from 'solid-js'
-import Cookies from 'js-cookie'
+import { Router, Route, useNavigate } from "@solidjs/router";
+import { lazy, onCleanup, onMount } from 'solid-js'
 import API from './api/client'
 
 import { installBridge } from './scripts/bridge'
+import { clearPendingEmail, readPendingEmail, writePendingEmail } from './pendingStorage.mjs'
 
 const Register = lazy(() => import('./components/Register'))
 const Verify = lazy(() => import('./components/Verify'))
@@ -12,102 +12,102 @@ const Dashboard = lazy(() => import('./components/Dashboard'))
 
 type Screen = 'login' | 'register' | 'verify' | 'dashboard'
 
-const verifyPeriod = (old: number): boolean => {
-    const period = 15 * 60 * 1000;
-    const now = Date.now();
-    return now - old > period;
-}
-
 const initialScreen = async (): Promise<Screen> => {
-    const token = Cookies.get('auth-token')
-    if (token) {
-        try {
-            await API.me()
-            return 'dashboard'
-        } catch {
-            Cookies.remove('auth-token')
-        }
-    }
+	try {
+		await API.me()
+		return 'dashboard'
+	} catch {
+		// Sem sessão válida, continua avaliando o cadastro pendente local.
+	}
 
-    const pending = localStorage.getItem('pending-email')
-    if (pending) {
-        const [time] = pending.split('|')
-
-        if (!verifyPeriod(Number(time))) {
-            return 'verify'
-        }
-
-        localStorage.removeItem('pending-email')
-    }
-
-    return 'login'
+    return readPendingEmail(localStorage) ? 'verify' : 'login'
 }
 
 const setPendingEmail = (email: string) => {
-    localStorage.setItem('pending-email', `${Date.now()}|${email}`)
+	writePendingEmail(localStorage, email)
 }
 
-const getPendingEmail = () => {
-    const pendingEmail = localStorage.getItem('pending-email')
-    if (!pendingEmail) {
-        return ''
-    }
+const InitialRedirect = () => {
+    const navigate = useNavigate()
 
-    const [time, email] = pendingEmail.split('|')
-    if (verifyPeriod(Number(time))) {
-        localStorage.removeItem('pending-email')
-        return ''
-    }
+    onMount(() => {
+        initialScreen()
+            .then(screen => navigate(`/${screen}`, { replace: true }))
+            .catch(() => navigate('/login', { replace: true }))
+    })
 
-    return email || ''
+    return <p style={{ color: 'var(--muted)', padding: '24px' }}>Carregando…</p>
 }
 
-const redirect = (screen: Screen) => {
-    switch (screen) {
-        case 'login': return window.location.href = '/login';
-        case 'register': return window.location.href = '/register';
-        case 'verify': return window.location.href = '/verify';
-        case 'dashboard': return window.location.href = '/dashboard';
-    }
-}
-
-export default () => {
-    onCleanup(installBridge())
+const AppRoutes = () => {
     return (
-        <Router>
+        <>
             <Route
                 path="/register"
-                component={() => <Register
-                    onRegistered={(email) => { setPendingEmail(email); redirect('verify') }}
-                    onLogin={() => redirect('login')}
-                />}
+                component={RegisterRoute}
             />
             <Route
                 path="/verify"
-                component={() => <Verify
-                    email={getPendingEmail()}
-                    onVerified={() => { localStorage.removeItem('pending-email'); redirect('login') }}
-                />}
+                component={VerifyRoute}
             />
             <Route
                 path="/login"
-                component={() => <Login
-                    onLoggedIn={() => redirect('dashboard')}
-                    onGoRegister={() => redirect('register')}
-                />}
+                component={LoginRoute}
             />
             <Route
                 path="/dashboard"
-                component={() => <Dashboard
-                    onLogout={() => redirect('login')}
-                />}
+                component={DashboardRoute}
             />
             <Route
                 path="*"
-                component={() => {
-                    initialScreen().then(redirect)
-                }}
+                component={InitialRedirect}
             />
+        </>
+    )
+}
+
+const RegisterRoute = () => {
+    const navigate = useNavigate()
+
+    return <Register
+        onRegistered={(email) => { setPendingEmail(email); navigate('/verify') }}
+        onLogin={() => navigate('/login')}
+    />
+}
+
+const VerifyRoute = () => {
+    const navigate = useNavigate()
+
+    return <Verify
+        email={readPendingEmail(localStorage)}
+        onVerified={() => { clearPendingEmail(localStorage); navigate('/login') }}
+    />
+}
+
+const LoginRoute = () => {
+    const navigate = useNavigate()
+
+    return <Login
+        onLoggedIn={() => navigate('/dashboard')}
+        onGoRegister={() => navigate('/register')}
+    />
+}
+
+const DashboardRoute = () => {
+    const navigate = useNavigate()
+
+    return <Dashboard onLogout={() => navigate('/login')} />
+}
+
+export default () => {
+    onMount(() => {
+        const uninstallBridge = installBridge()
+        onCleanup(uninstallBridge)
+    })
+
+    return (
+        <Router>
+            <AppRoutes />
         </Router>
     )
 }

@@ -3,16 +3,23 @@ services:
         build:
             context: .
             dockerfile: dockerfile
+            args:
+                VITE_AUTH_BRIDGE_ORIGINS: ${VITE_AUTH_BRIDGE_ORIGINS:-}
+                NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}
+                GO_IMAGE: ${GO_IMAGE:-golang:1.26-alpine}
+                RUNTIME_IMAGE: ${RUNTIME_IMAGE:-alpine:3.21}
         container_name: auth-service
         restart: unless-stopped
+        env_file:
+            - .env
         ports:
             - "8123:8888"
         environment:
             SERVER_PORT: "8888"
-            JWT_SECRET: ${JWT_SECRET}
-            RESEND_API_KEY: ${RESEND_API_KEY}
-            RESEND_FROM: ${RESEND_FROM}
             DB_URL: /data/auth.sqlite
+        cpus: "1.0"
+        mem_limit: 256m
+        stop_grace_period: 35s
         volumes:
             - auth_data:/data
 

@@ -4,11 +4,11 @@ import Input from '../fragments/Input'
 import Alert from '../fragments/Alert'
 
 import API from '../api/client'
-import Cookies from 'js-cookie'
+import { errorMessage } from '../api/errorMessage'
 
 
 interface Props {
-    onLoggedIn: (token: string) => void
+    onLoggedIn: () => void
     onGoRegister: () => void
 }
 
@@ -19,14 +19,15 @@ export default (props: Props) => {
     const [error, setError] = createSignal('')
 
     const submit = async () => {
+        if (loading()) return
+
         setError('')
         setLoading(true)
         try {
-            const { token } = await API.login(email(), password())
-            Cookies.set('auth-token', token)
-            props.onLoggedIn(token)
-        } catch (e: any) {
-            setError(e.message)
+            await API.login(email(), password())
+            props.onLoggedIn()
+        } catch (error: unknown) {
+            setError(errorMessage(error))
         } finally {
             setLoading(false)
         }

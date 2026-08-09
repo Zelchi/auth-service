@@ -1,47 +1,70 @@
 package jwt
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"os"
-	"strings"
 	"time"
+
+	jwtv5 "github.com/golang-jwt/jwt/v5"
 )
 
 func ValidateToken(tokenStr string) (*JWTClaims, error) {
-	secret := os.Getenv("JWT_SECRET")
-
-	parts := strings.Split(tokenStr, ".")
-	if len(parts) != 3 {
+	if tokenStr == "" {
 		return nil, errors.New("token malformado")
 	}
 
-	payload := parts[0] + "." + parts[1]
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload))
-	expectedSig := b64(mac.Sum(nil))
-
-	if !hmac.Equal([]byte(parts[2]), []byte(expectedSig)) {
-		return nil, errors.New("assinatura inválida")
-	}
-
-	claimsBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+	secrets, err := signingKeys()
 	if err != nil {
-		return nil, fmt.Errorf("erro ao decodificar claims: %w", err)
+		return nil, err
 	}
 
-	var claims JWTClaims
-	if err := json.Unmarshal(claimsBytes, &claims); err != nil {
-		return nil, fmt.Errorf("erro ao parsear claims: %w", err)
+	var lastErr error
+	for _, secret := range secrets {
+		var claims jwtv5.RegisteredClaims
+		token, parseErr := jwtv5.ParseWithClaims(
+			tokenStr,
+			&claims,
+			func(token *jwtv5.Token) (any, error) {
+				if token.Method != jwtv5.SigningMethodHS256 {
+					return nil, errors.New("algoritmo de token não suportado")
+				}
+				if typ, ok := token.Header["typ"].(string); !ok || typ != "JWT" {
+					return nil, errors.New("tipo de token não suportado")
+				}
+				return secret, nil
+			},
+			jwtv5.WithValidMethods([]string{jwtv5.SigningMethodHS256.Alg()}),
+		)
+		if parseErr != nil {
+			lastErr = parseErr
+			continue
+		}
+		if token == nil || !token.Valid {
+			lastErr = errors.New("token inválido")
+			continue
+		}
+
+		now := time.Now()
+		if claims.Subject == "" {
+			return nil, errors.New("token sem sujeito")
+		}
+		if claims.IssuedAt == nil || claims.IssuedAt.Unix() <= 0 ||
+			claims.IssuedAt.Time.After(now.Add(60*time.Second)) {
+			return nil, errors.New("data de emissão inválida")
+		}
+		if claims.ExpiresAt == nil || !claims.ExpiresAt.Time.After(claims.IssuedAt.Time) ||
+			!claims.ExpiresAt.Time.After(now) {
+			return nil, errors.New("token expirado")
+		}
+
+		return &JWTClaims{
+			Sub: claims.Subject,
+			Iat: claims.IssuedAt.Unix(),
+			Exp: claims.ExpiresAt.Unix(),
+		}, nil
 	}
 
-	if time.Now().Unix() > claims.Exp {
-		return nil, errors.New("token expirado")
+	if lastErr == nil {
+		lastErr = errors.New("token inválido")
 	}
-
-	return &claims, nil
+	return nil, lastErr
 }

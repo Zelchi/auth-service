@@ -3,12 +3,15 @@ package handler
 import (
 	"crypto/rand"
 	"fmt"
+	"math/big"
 )
 
 func generateCode() (string, error) {
-	b := make([]byte, 3)
-	if _, err := rand.Read(b); err != nil {
+	max := big.NewInt(1_000_000)
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%06d", int(b[0])<<16|int(b[1])<<8|int(b[2]))[:6], nil
+
+	return fmt.Sprintf("%06d", n.Int64()), nil
 }

@@ -4,6 +4,7 @@ import Input from '../fragments/Input'
 import Alert from '../fragments/Alert'
 
 import API from '../api/client'
+import { errorMessage } from '../api/errorMessage'
 
 interface Props {
     onRegistered: (email: string) => void
@@ -17,13 +18,15 @@ export default (props: Props) => {
     const [error, setError] = createSignal('')
 
     const submit = async () => {
+        if (loading()) return
+
         setError('')
         setLoading(true)
         try {
             await API.register(email(), password())
             props.onRegistered(email())
-        } catch (e: any) {
-            setError(e.message)
+        } catch (error: unknown) {
+            setError(errorMessage(error))
         } finally {
             setLoading(false)
         }

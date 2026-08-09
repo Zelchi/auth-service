@@ -3,9 +3,9 @@ package handler
 import (
 	"authentication/core/database"
 	"authentication/core/jwt"
-	"encoding/json"
+	"database/sql"
+	"errors"
 	"net/http"
-	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -17,24 +17,33 @@ type loginRequest struct {
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "método não permitido", http.StatusMethodNotAllowed)
+		methodNotAllowed(w)
 		return
 	}
 
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body inválido"})
 		return
 	}
 
-	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	normalizedEmail, validEmail := normalizeEmail(req.Email)
+	if !validEmail || !validPassword(req.Password) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "credenciais inválidas"})
+		return
+	}
+	req.Email = normalizedEmail
 
 	var userID, hash string
-	err := database.DB.QueryRow(
+	err := database.DB.QueryRowContext(r.Context(),
 		`SELECT id, password FROM users WHERE email = ?`,
 		req.Email,
 	).Scan(&userID, &hash)
 	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao consultar usuário"})
+			return
+		}
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "credenciais inválidas"})
 		return
 	}
@@ -50,8 +59,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	http.SetCookie(w, sessionCookie(r, token))
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]string{
-		"token":   token,
 		"user_id": userID,
 	})
 }

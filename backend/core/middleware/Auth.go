@@ -3,6 +3,7 @@ package middleware
 import (
 	"authentication/core/jwt"
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 )
@@ -11,18 +12,34 @@ type contextKey string
 
 const UserIDKey contextKey = "user_id"
 
+func writeAuthError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
 func Auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			http.Error(w, `{"error":"token não informado"}`, http.StatusUnauthorized)
+		var tokenStr string
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenStr = strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		}
+
+		if tokenStr == "" {
+			if cookie, err := r.Cookie("auth-token"); err == nil {
+				tokenStr = strings.TrimSpace(cookie.Value)
+			}
+		}
+
+		if tokenStr == "" {
+			writeAuthError(w, http.StatusUnauthorized, "token não informado")
 			return
 		}
 
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 		claims, err := jwt.ValidateToken(tokenStr)
 		if err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusUnauthorized)
+			writeAuthError(w, http.StatusUnauthorized, "token inválido")
 			return
 		}
 

@@ -3,7 +3,7 @@ package handler
 import (
 	"authentication/core/database"
 	"authentication/core/pending"
-	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -17,45 +17,54 @@ type verifyRequest struct {
 
 func Verify(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "método não permitido", http.StatusMethodNotAllowed)
+		methodNotAllowed(w)
 		return
 	}
 
 	var req verifyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body inválido"})
 		return
 	}
 
-	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	normalizedEmail, validEmail := normalizeEmail(req.Email)
+	if !validEmail {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email inválido"})
+		return
+	}
+	req.Email = normalizedEmail
 	req.Code = strings.TrimSpace(req.Code)
 
-	if req.Email == "" || req.Code == "" {
+	if !validVerificationCode(req.Code) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email e código são obrigatórios"})
 		return
 	}
 
-	reg, ok := pending.Get(req.Email)
-	if !ok {
+	reg, validCode, exists, err := pending.Check(r.Context(), req.Email, digestVerificationCode(req.Code))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao consultar verificação"})
+		return
+	}
+	if !exists {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "código expirado ou inexistente, registre-se novamente",
 		})
 		return
 	}
 
-	if reg.Code != req.Code {
+	if !validCode {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "código inválido"})
 		return
 	}
 
 	userID := uuid.New().String()
-	_, err := database.DB.Exec(
+	_, err = database.DB.ExecContext(r.Context(),
 		`INSERT INTO users (id, email, password) VALUES (?, ?, ?)`,
 		userID, reg.Email, reg.PasswordHash,
 	)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
-			pending.Delete(req.Email)
+			_ = pending.Delete(r.Context(), req.Email)
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "email já cadastrado"})
 			return
 		}
@@ -63,7 +72,9 @@ func Verify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pending.Delete(req.Email)
+	if err := pending.Delete(r.Context(), req.Email); err != nil {
+		slog.Error("pending_registration_cleanup_failed", "error", err)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "conta verificada com sucesso!"})
 }

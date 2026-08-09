@@ -1,8 +1,7 @@
-import { createResource, Show } from 'solid-js'
+import { createEffect, createResource, Show } from 'solid-js'
 import { styled } from 'solid-styled-components'
 import { Button } from '../styles'
 
-import Cookies from 'js-cookie'
 import API from '../api/client'
 
 const Shell = styled('div')`
@@ -69,10 +68,21 @@ interface Props {
 
 export default (props: Props) => {
     const [user] = createResource(() => API.me())
+	let redirected = false
 
-    const logout = () => {
-        Cookies.remove('auth-token')
-        props.onLogout()
+	createEffect(() => {
+		if (user.error && !redirected) {
+			redirected = true
+			props.onLogout()
+		}
+	})
+
+    const logout = async () => {
+        try {
+            await API.logout()
+        } finally {
+            props.onLogout()
+        }
     }
 
     const formatDate = (iso: string) =>
@@ -83,7 +93,11 @@ export default (props: Props) => {
     return (
         <Shell>
             <Show when={user()} fallback={
-                <p style={{ color: 'var(--muted)' }}>Carregando…</p>
+                <Show when={!user.error} fallback={
+                    <p style={{ color: 'var(--muted)' }}>Sessão expirada. Redirecionando…</p>
+                }>
+                    <p style={{ color: 'var(--muted)' }}>Carregando…</p>
+                </Show>
             }>
                 {data => (
                     <ProfileCard>

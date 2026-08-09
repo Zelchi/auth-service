@@ -1,4 +1,4 @@
-import { Show, type JSX } from 'solid-js'
+import { Show, splitProps, type JSX } from 'solid-js'
 import { styled } from 'solid-styled-components'
 
 const InputEl = styled('input')`
@@ -26,15 +26,15 @@ type InputProps = {
 } & JSX.InputHTMLAttributes<HTMLInputElement>
 
 export default (props: InputProps) => {
-    const { label, ...rest } = props
+    const [local, inputProps] = splitProps(props, ['label'])
     return (
         <div style={{ display: 'flex', 'flex-direction': 'column', gap: '6px', width: '100%' }}>
-            <Show when={label}>
+            <Show when={local.label}>
                 <label style={{ 'font-size': '13px', color: 'var(--muted)', 'letter-spacing': '0.03em' }}>
-                    {label}
+                    {local.label}
                 </label>
             </Show>
-            <InputEl {...rest} />
+            <InputEl {...inputProps} />
         </div>
     )
 }

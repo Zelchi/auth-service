@@ -2,11 +2,15 @@ package email
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
+	"time"
 )
 
 type resendRequest struct {
@@ -16,13 +20,21 @@ type resendRequest struct {
 	Html    string   `json:"html"`
 }
 
-type resendError struct {
-	Name       string `json:"name"`
-	Message    string `json:"message"`
-	StatusCode int    `json:"statusCode"`
+type providerError struct {
+	statusCode int
 }
 
-func SendVerificationCode(to, code string) error {
+const defaultResendEndpoint = "https://api.resend.com/emails"
+
+const maxAttempts = 3
+
+var resendHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
+func (e *providerError) Error() string {
+	return fmt.Sprintf("Resend retornou status %d", e.statusCode)
+}
+
+func SendVerificationCode(ctx context.Context, to, code string) error {
 	apiKey := os.Getenv("RESEND_API_KEY")
 	fromDomain := os.Getenv("RESEND_FROM")
 
@@ -38,30 +50,70 @@ func SendVerificationCode(to, code string) error {
 		return fmt.Errorf("erro ao serializar payload: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("erro ao criar request: %w", err)
+	endpoint := os.Getenv("RESEND_API_URL")
+	if endpoint == "" {
+		endpoint = defaultResendEndpoint
 	}
-
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("erro ao chamar API do Resend: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		raw, _ := io.ReadAll(resp.Body)
-		var resendErr resendError
-		if err := json.Unmarshal(raw, &resendErr); err == nil && resendErr.Message != "" {
-			return fmt.Errorf("resend error %d: %s", resendErr.StatusCode, resendErr.Message)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("erro ao criar request: %w", err)
 		}
-		return fmt.Errorf("resend retornou status %d: %s", resp.StatusCode, string(raw))
+
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := resendHTTPClient.Do(req)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if attempt == maxAttempts || !isTransientNetworkError(err) {
+				return fmt.Errorf("erro ao chamar API do Resend: %w", err)
+			}
+			if err := waitBeforeRetry(ctx, attempt); err != nil {
+				return err
+			}
+			continue
+		}
+
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		_ = resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+			return nil
+		}
+		if attempt == maxAttempts || !isTransientStatus(resp.StatusCode) {
+			return &providerError{statusCode: resp.StatusCode}
+		}
+		if err := waitBeforeRetry(ctx, attempt); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return errors.New("falha ao enviar email")
+}
+
+func isTransientStatus(status int) bool {
+	return status == http.StatusTooManyRequests || status >= 500
+}
+
+func isTransientNetworkError(err error) bool {
+	var networkErr net.Error
+	return errors.As(err, &networkErr) && (networkErr.Timeout() || networkErr.Temporary())
+}
+
+func waitBeforeRetry(ctx context.Context, attempt int) error {
+	delay := time.Duration(250*(1<<(attempt-1))) * time.Millisecond
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func buildEmailHTML(code string) string {

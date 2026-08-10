@@ -3,17 +3,19 @@ import { styled } from 'solid-styled-components'
 
 const InputEl = styled('input')`
     width: 100%;
-    padding: 12px 14px;
+    min-height: 42px;
+    padding: 10px 12px;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
     color: var(--text);
     font-family: inherit;
     font-size: 15px;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
 
     &:focus {
         border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(74, 94, 133, 0.14);
     }
 
     &::placeholder {
@@ -30,7 +32,7 @@ export default (props: InputProps) => {
     return (
         <div style={{ display: 'flex', 'flex-direction': 'column', gap: '6px', width: '100%' }}>
             <Show when={local.label}>
-                <label style={{ 'font-size': '13px', color: 'var(--muted)', 'letter-spacing': '0.03em' }}>
+                <label style={{ 'font-size': '12px', color: 'var(--muted)', 'letter-spacing': '0.04em' }}>
                     {local.label}
                 </label>
             </Show>

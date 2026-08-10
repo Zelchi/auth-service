@@ -6,6 +6,8 @@ server
 *.env
 *.sqlite
 *.db
+*.sqlite-shm
+*.sqlite-wal
 
 logs
 *.log

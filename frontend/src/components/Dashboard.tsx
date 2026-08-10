@@ -6,30 +6,31 @@ import API from '../api/client'
 
 const Shell = styled('div')`
     min-height: 100dvh;
-    width: 100dvw;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 24px;
-    gap: 32px;
+    padding: 20px;
+    gap: 24px;
 `
 
 const ProfileCard = styled('div')`
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 36px 32px;
+    box-shadow: 0 16px 40px rgba(16, 24, 40, 0.08);
+    padding: 24px;
     width: 100%;
-    max-width: 400px;
+    max-width: 380px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
 `
 
 const Avatar = styled('div')`
-    width: 56px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
     background: var(--accent);
     display: flex;

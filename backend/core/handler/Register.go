@@ -14,8 +14,9 @@ import (
 )
 
 type registerRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email                string `json:"email"`
+	Password             string `json:"password"`
+	PasswordConfirmation string `json:"password_confirmation"`
 }
 
 var sendVerificationCode = email.SendVerificationCode
@@ -33,13 +34,17 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	normalizedEmail, validEmail := normalizeEmail(req.Email)
-	if !validEmail || req.Password == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email e senha são obrigatórios e válidos"})
+	if !validEmail || req.Password == "" || req.PasswordConfirmation == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email, senha e confirmação de senha são obrigatórios e válidos"})
 		return
 	}
 	req.Email = normalizedEmail
 	if !validPassword(req.Password) {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "senha deve ter entre 8 e 72 bytes"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "senha deve ter entre 8 e 72 caracteres e conter maiúscula, minúscula e número"})
+		return
+	}
+	if req.Password != req.PasswordConfirmation {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "as senhas não coincidem"})
 		return
 	}
 
@@ -54,7 +59,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword(passwordHashInput(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "erro ao processar senha"})
 		return

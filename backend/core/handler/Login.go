@@ -28,7 +28,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	normalizedEmail, validEmail := normalizeEmail(req.Email)
-	if !validEmail || !validPassword(req.Password) {
+	if !validEmail || !validPasswordLength(req.Password) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "credenciais inválidas"})
 		return
 	}
@@ -48,7 +48,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(hash), passwordHashInput(req.Password)); err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "credenciais inválidas"})
 		return
 	}

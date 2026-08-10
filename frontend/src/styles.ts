@@ -2,9 +2,9 @@ import { styled } from 'solid-styled-components'
 
 export const Button = styled('button') <{ loading?: boolean }>`
     width: 100%;
-    height: 40px;
-    margin-top: 12px;
-    padding-bottom: 4px;
+    min-height: 42px;
+    margin-top: 0;
+    padding: 0 16px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -17,40 +17,50 @@ export const Button = styled('button') <{ loading?: boolean }>`
     font-weight: 600;
     letter-spacing: 0.02em;
     cursor: pointer;
-    transition: background 0.15s, opacity 0.15s;
+    transition: background 0.15s, opacity 0.15s, transform 0.15s;
     opacity: ${p => p.loading ? '0.6' : '1'};
     pointer-events: ${p => p.loading ? 'none' : 'auto'};
     &:hover {
         background: var(--accent-hover);
+        transform: translateY(-1px);
     }
+    &:active { transform: translateY(0); }
     @media (prefers-color-scheme: light) {
         color: #fff;
     }
 `
 
 export const Card = styled('div')`
-    position: relative;
     background: var(--surface);
-    padding: 36px 32px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(16, 24, 40, 0.08);
+    padding: 28px 24px;
     width: 100%;
-    max-width: 400px;
+    max-width: 380px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
+
+    @media (max-width: 480px) {
+        border-radius: 14px;
+        padding: 24px 20px;
+    }
 `
 
 export const Center = styled('div')`
-    background: var(--surface);
-    height: 100dvh;
-    width: 100dvw;
+    background: var(--bg);
+    min-height: 100dvh;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: 64px 20px 24px;
+    overflow-y: auto;
 `
 
 export const Title = styled('h1')`
-    font-size: 22px;
+    font-size: 21px;
     font-weight: 700;
     color: var(--text);
     letter-spacing: -0.02em;
@@ -58,9 +68,10 @@ export const Title = styled('h1')`
 `
 
 export const Subtitle = styled('p')`
-    font-size: 14px;
+    font-size: 13px;
     color: var(--muted);
-    margin: -8px 0 0;
+    margin: 4px 0 0;
+    line-height: 1.45;
 `
 
 export const TextLink = styled('button')`

@@ -134,7 +134,7 @@ Todos os endpoints JSON usam <code>Content-Type: application/json</code>. Erros 
 | <code>GET</code> | <code>/healthz</code> | Pública | Verifica se o processo está ativo. |
 | <code>GET</code> | <code>/readyz</code> | Pública | Verifica se o SQLite está disponível. |
 | <code>GET</code> | <code>/metrics</code> | Pública | Expõe métricas no formato Prometheus. |
-| <code>POST</code> | <code>/api/register</code> | Pública | Cria um cadastro pendente e envia o código. |
+| <code>POST</code> | <code>/api/register</code> | Pública | Cria um cadastro pendente, valida a força da senha e envia o código. |
 | <code>POST</code> | <code>/api/verify</code> | Pública | Confirma o código e cria o usuário. |
 | <code>POST</code> | <code>/api/resend</code> | Pública | Reenvia o código de um cadastro pendente. |
 | <code>POST</code> | <code>/api/login</code> | Pública | Valida credenciais e cria a sessão. |
@@ -144,9 +144,11 @@ Todos os endpoints JSON usam <code>Content-Type: application/json</code>. Erros 
 
 ### Cadastro e confirmação
 
+O cadastro exige <code>password</code> e <code>password_confirmation</code> iguais. A senha deve ter entre 8 e 72 caracteres e conter pelo menos uma letra minúscula, uma letra maiúscula e um número.
+
 ~~~bash
 export AUTH_URL=http://localhost:8888
-curl -i -X POST "$AUTH_URL/api/register" -H 'Content-Type: application/json' --data '{"email":"ana@example.com","password":"uma-senha-segura"}'
+curl -i -X POST "$AUTH_URL/api/register" -H 'Content-Type: application/json' --data '{"email":"ana@example.com","password":"UmaSenhaSegura1","password_confirmation":"UmaSenhaSegura1"}'
 ~~~
 
 O código chega no email informado. Confirme a conta com:
@@ -168,7 +170,7 @@ O código expira em 15 minutos e a conta é removida após 5 tentativas inválid
 Guarde o cookie retornado pelo login:
 
 ~~~bash
-curl -i -c cookies.txt -X POST "$AUTH_URL/api/login" -H 'Content-Type: application/json' --data '{"email":"ana@example.com","password":"uma-senha-segura"}'
+curl -i -c cookies.txt -X POST "$AUTH_URL/api/login" -H 'Content-Type: application/json' --data '{"email":"ana@example.com","password":"UmaSenhaSegura1"}'
 ~~~
 
 Consulte o usuário autenticado:
@@ -192,7 +194,7 @@ curl -i -b cookies.txt -X POST "$AUTH_URL/api/logout"
 ## Regras e proteções
 
 - emails são normalizados para letras minúsculas e limitados a 254 caracteres;
-- senhas têm entre 8 e 72 bytes e nunca são armazenadas em texto puro;
+- novas senhas têm entre 8 e 72 caracteres, com minúscula, maiúscula e número, e nunca são armazenadas em texto puro;
 - códigos de confirmação têm exatamente 6 dígitos;
 - tokens de sessão duram 24 horas;
 - tokens de bridge duram 5 minutos e não renovam a sessão principal;

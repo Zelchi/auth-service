@@ -98,7 +98,29 @@ func TestMeReturnsAuthenticatedUser(t *testing.T) {
 }
 
 func TestRegisterRejectsUnknownJSONFields(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"email":"user@example.com","password":"correct-password","extra":true}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"email":"user@example.com","password":"StrongPassword1","password_confirmation":"StrongPassword1","extra":true}`))
+	recorder := httptest.NewRecorder()
+
+	Register(recorder, req)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+}
+
+func TestRegisterRejectsWeakPassword(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"email":"user@example.com","password":"weak-password1","password_confirmation":"weak-password1"}`))
+	recorder := httptest.NewRecorder()
+
+	Register(recorder, req)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+}
+
+func TestRegisterRejectsMismatchedPasswords(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"email":"user@example.com","password":"StrongPassword1","password_confirmation":"DifferentPassword1"}`))
 	recorder := httptest.NewRecorder()
 
 	Register(recorder, req)
@@ -124,7 +146,7 @@ func TestRegisterStoresPendingRegistrationAndSendsCode(t *testing.T) {
 	}
 	t.Cleanup(func() { sendVerificationCode = previousSender })
 
-	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"email":"New@Example.com","password":"correct-password"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"email":"New@Example.com","password":"StrongPassword1","password_confirmation":"StrongPassword1"}`))
 	recorder := httptest.NewRecorder()
 	Register(recorder, req)
 
@@ -157,7 +179,7 @@ func TestRegisterDeletesPendingRegistrationWhenEmailFails(t *testing.T) {
 	t.Cleanup(func() { sendVerificationCode = previousSender })
 
 	email := "failed@example.com"
-	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"email":"failed@example.com","password":"correct-password"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/register", strings.NewReader(`{"email":"failed@example.com","password":"StrongPassword1","password_confirmation":"StrongPassword1"}`))
 	recorder := httptest.NewRecorder()
 	Register(recorder, req)
 

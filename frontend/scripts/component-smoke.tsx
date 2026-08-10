@@ -44,7 +44,12 @@ const testLogin = async () => {
 
 const testRegister = async () => {
     let registeredEmail = ''
-    API.register = async () => ({ message: 'código enviado' })
+    let registerCalls = 0
+    API.register = async (_email, password, confirmation) => {
+        registerCalls += 1
+        assert(password === confirmation, 'cadastro não enviou senhas iguais')
+        return { message: 'código enviado' }
+    }
 
     const dispose = render(() => (
         <Register onRegistered={email => { registeredEmail = email }} onLogin={() => undefined} />
@@ -52,11 +57,20 @@ const testRegister = async () => {
 
     const inputs = root.querySelectorAll<HTMLInputElement>('input')
     await fill(inputs[0], 'new@example.com')
-    await fill(inputs[1], 'correct-password')
+    await fill(inputs[1], 'weak-password1')
+    await fill(inputs[2], 'weak-password1')
+    root.querySelectorAll<HTMLButtonElement>('button')[0].click()
+    await waitForUpdate()
+
+    assert(registerCalls === 0, 'cadastro aceitou uma senha fraca')
+
+    await fill(inputs[1], 'StrongPassword1')
+    await fill(inputs[2], 'StrongPassword1')
     root.querySelectorAll<HTMLButtonElement>('button')[0].click()
     await waitForUpdate()
 
     assert(registeredEmail === 'new@example.com', 'cadastro não repassou o email registrado')
+    assert(registerCalls === 1, 'cadastro não chamou a API com uma senha forte')
     dispose()
     resetRoot()
 }

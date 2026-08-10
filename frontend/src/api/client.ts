@@ -29,9 +29,9 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
 }
 
 export default {
-    register: (email: string, password: string) => request<{ message: string }>('/register', {
+    register: (email: string, password: string, passwordConfirmation: string) => request<{ message: string }>('/register', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, password_confirmation: passwordConfirmation }),
     }),
 
     verify: (email: string, code: string) => request<{ message: string }>('/verify', {

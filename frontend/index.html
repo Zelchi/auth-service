@@ -80,9 +80,14 @@
 
         html,
         body {
-            height: 100dvh;
-            width: 100dvw;
-            overflow: hidden;
+            min-height: 100dvh;
+            width: 100%;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        body {
+            background: var(--bg);
         }
     </style>
 </head>

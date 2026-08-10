@@ -46,7 +46,7 @@ export const Card = styled('div')`
 `
 
 export const Center = styled('div')`
-    background: #121212;
+    background: var(--bg);
     min-height: 100dvh;
     width: 100%;
     display: flex;

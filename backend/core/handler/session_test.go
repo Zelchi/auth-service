@@ -43,6 +43,17 @@ func TestSessionCookieForCrossSiteIframeRequiresSecure(t *testing.T) {
 	}
 }
 
+func TestSessionCookieUsesConfiguredDomain(t *testing.T) {
+	t.Setenv("COOKIE_DOMAIN", ".example.com")
+
+	r := httptest.NewRequest(http.MethodPost, "https://auth.example.com/api/login", nil)
+	cookie := sessionCookie(r, "token")
+
+	if cookie.Domain != ".example.com" {
+		t.Fatalf("Domain = %q, want %q", cookie.Domain, ".example.com")
+	}
+}
+
 func TestLogoutExpiresSessionCookie(t *testing.T) {
 	t.Setenv("COOKIE_SECURE", "true")
 	r := httptest.NewRequest(http.MethodPost, "/api/logout", nil)
@@ -101,6 +112,9 @@ func TestLoginSetsSessionCookieWithoutReturningToken(t *testing.T) {
 			id TEXT PRIMARY KEY,
 			email TEXT NOT NULL UNIQUE,
 			password TEXT NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			image TEXT NOT NULL DEFAULT '',
+			name_normalized TEXT NOT NULL DEFAULT '',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)
 	`); err != nil {

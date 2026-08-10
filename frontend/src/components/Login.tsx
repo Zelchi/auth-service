@@ -1,18 +1,21 @@
 import { createEffect, createSignal } from 'solid-js'
+import { useLocation } from '@solidjs/router'
 import { Button, Card, Center, Title, TextLink } from '../styles'
 import Input from '../fragments/Input'
 import Alert from '../fragments/Alert'
 
 import API from '../api/client'
 import { errorMessage } from '../api/errorMessage'
+import { safeReturnTo } from '../returnTo'
 
 
 interface Props {
-    onLoggedIn: () => void
+    onLoggedIn: (returnTo: string) => void
     onGoRegister: () => void
 }
 
 export default (props: Props) => {
+    const location = useLocation()
     const [email, setEmail] = createSignal('')
     const [password, setPassword] = createSignal('')
     const [loading, setLoading] = createSignal(false)
@@ -25,7 +28,8 @@ export default (props: Props) => {
         setLoading(true)
         try {
             await API.login(email(), password())
-            props.onLoggedIn()
+            const params = new URLSearchParams(location.search)
+            props.onLoggedIn(safeReturnTo(params.get('returnTo')))
         } catch (error: unknown) {
             setError(errorMessage(error))
         } finally {

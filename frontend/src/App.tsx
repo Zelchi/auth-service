@@ -1,4 +1,4 @@
-import { Router, Route, useNavigate } from "@solidjs/router";
+import { Router, Route, useLocation, useNavigate } from "@solidjs/router";
 import { lazy, onCleanup, onMount } from 'solid-js'
 import API from './api/client'
 
@@ -68,35 +68,46 @@ const AppRoutes = () => {
 
 const RegisterRoute = () => {
     const navigate = useNavigate()
+    const location = useLocation()
 
     return <Register
-        onRegistered={(email) => { setPendingEmail(email); navigate('/verify') }}
-        onLogin={() => navigate('/login')}
+        onRegistered={(email) => { setPendingEmail(email); navigate(`/verify${location.search}`) }}
+        onLogin={() => navigate(`/login${location.search}`)}
     />
 }
 
 const VerifyRoute = () => {
     const navigate = useNavigate()
+    const location = useLocation()
 
     return <Verify
         email={readPendingEmail(localStorage)}
-        onVerified={() => { clearPendingEmail(localStorage); navigate('/login') }}
+        onVerified={() => { clearPendingEmail(localStorage); navigate(`/login${location.search}`) }}
     />
 }
 
 const LoginRoute = () => {
     const navigate = useNavigate()
+    const location = useLocation()
 
     return <Login
-        onLoggedIn={() => navigate('/dashboard')}
-        onGoRegister={() => navigate('/register')}
+        onLoggedIn={(returnTo) => {
+            if (returnTo.startsWith('/')) {
+                navigate(returnTo)
+                return
+            }
+            navigate(`/dashboard?returnTo=${encodeURIComponent(returnTo)}`)
+        }}
+        onGoRegister={() => navigate(`/register${location.search}`)}
     />
 }
 
 const DashboardRoute = () => {
     const navigate = useNavigate()
+    const location = useLocation()
+    const returnTo = new URLSearchParams(location.search).get('returnTo') ?? undefined
 
-    return <Dashboard onLogout={() => navigate('/login')} />
+    return <Dashboard onLogout={() => navigate('/login')} returnTo={returnTo} />
 }
 
 export default () => {

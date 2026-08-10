@@ -16,7 +16,7 @@ const Alert = styled('div') <{ kind: 'error' | 'success' }>`
     line-height: 1.35;
     border: 1px solid ${p => p.kind === 'error' ? 'var(--error)' : 'var(--success)'};
     color: ${p => p.kind === 'error' ? 'var(--error)' : 'var(--success)'};
-    background: ${p => p.kind === 'error' ? 'rgba(255,122,122,0.10)' : 'rgba(114,214,154,0.10)'};
+    background: ${p => p.kind === 'error' ? 'rgba(180, 50, 50, 0.12)' : 'rgba(70, 150, 95, 0.12)'};
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.36);
     transform: translateX(-50%);
     animation: toast-in 0.18s ease-out;

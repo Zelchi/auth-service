@@ -17,7 +17,7 @@ func sessionCookie(r *http.Request, token string) *http.Cookie {
 		secure = true
 	}
 
-	return &http.Cookie{
+	cookie := &http.Cookie{
 		Name:     "auth-token",
 		Value:    token,
 		Path:     "/",
@@ -27,6 +27,10 @@ func sessionCookie(r *http.Request, token string) *http.Cookie {
 		Secure:   secure,
 		SameSite: sameSite,
 	}
+	if domain := strings.TrimSpace(os.Getenv("COOKIE_DOMAIN")); domain != "" {
+		cookie.Domain = domain
+	}
+	return cookie
 }
 
 func expiredSessionCookie(r *http.Request) *http.Cookie {

@@ -73,6 +73,15 @@ yarn dev
 
 O Vite disponibiliza a aplicação normalmente em <http://localhost:5173> e encaminha <code>/api</code> para o backend em <code>localhost:8888</code>.
 
+Para iniciar o backend e o frontend de desenvolvimento juntos, use na raiz:
+
+~~~bash
+make dev
+~~~
+
+Nesse modo, a API fica em <code>http://localhost:8888</code> e o frontend em
+<code>http://localhost:5173</code>.
+
 ## Execução com Docker
 
 ### 1. Crie o arquivo de ambiente
@@ -117,7 +126,9 @@ Para execução local, use <code>backend/.env</code>. No Docker, use o <code>.en
 | <code>FRAME_ANCESTORS</code> | Não | <code>'self'</code> | Origens permitidas pelo header CSP <code>frame-ancestors</code>. |
 | <code>COOKIE_SECURE</code> | Não | automático | Use <code>true</code> em HTTPS; em desenvolvimento, <code>false</code>. |
 | <code>COOKIE_SAMESITE</code> | Não | <code>lax</code> | Política SameSite do cookie: <code>lax</code>, <code>strict</code> ou <code>none</code>. |
+| <code>COOKIE_DOMAIN</code> | Não | vazio | Domínio compartilhado do cookie, por exemplo <code>.example.com</code>, quando o blog e o auth-service usam subdomínios diferentes. |
 | <code>VITE_AUTH_BRIDGE_ORIGINS</code> | Não | vazio | Lista, separada por vírgulas, de origens autorizadas para o bridge. É aplicada no build do frontend. |
+| <code>VITE_AUTH_RETURN_ORIGINS</code> | Não | vazio | Origens permitidas para retornar ao aplicativo depois do login, por exemplo <code>https://blog.example.com</code>. É aplicada no build do frontend. |
 
 ## API
 
@@ -139,7 +150,8 @@ Todos os endpoints JSON usam <code>Content-Type: application/json</code>. Erros 
 | <code>POST</code> | <code>/api/resend</code> | Pública | Reenvia o código de um cadastro pendente. |
 | <code>POST</code> | <code>/api/login</code> | Pública | Valida credenciais e cria a sessão. |
 | <code>POST</code> | <code>/api/logout</code> | Cookie/origem | Encerra a sessão no navegador. |
-| <code>GET</code> | <code>/api/me</code> | Cookie ou Bearer | Retorna o usuário autenticado. |
+| <code>GET</code> | <code>/api/me</code> | Cookie ou Bearer | Retorna o usuário autenticado, incluindo nome e foto. |
+| <code>PATCH</code> | <code>/api/me</code> | Cookie/origem | Atualiza o nome e a foto do usuário. O nome é único. |
 | <code>POST</code> | <code>/api/bridge/token</code> | Cookie ou Bearer | Gera um token de integração válido por 5 minutos. |
 
 ### Cadastro e confirmação
@@ -179,6 +191,19 @@ Consulte o usuário autenticado:
 curl -i -b cookies.txt "$AUTH_URL/api/me"
 ~~~
 
+No primeiro acesso, defina o nome público e, opcionalmente, uma foto. O nome não pode
+ser igual ao de outro usuário e pode ser alterado depois:
+
+~~~bash
+curl -i -b cookies.txt -X PATCH "$AUTH_URL/api/me" \
+  -H 'Content-Type: application/json' \
+  --data '{"name":"Ana Lima","image":""}'
+~~~
+
+A interface aceita PNG, JPEG, WEBP ou GIF de até 20 MB, redimensiona e comprime a
+imagem no navegador antes de enviá-la. O resultado fica limitado a 512 KB. Se
+nenhuma foto for informada, as aplicações podem usar a primeira letra do nome como avatar.
+
 Também é possível usar o JWT explicitamente:
 
 ~~~bash
@@ -203,8 +228,17 @@ curl -i -b cookies.txt -X POST "$AUTH_URL/api/logout"
 - endpoints sensíveis têm limites por IP, email e combinação IP/email;
 - cookies usam <code>HttpOnly</code> e <code>SameSite</code>, com <code>Secure</code> configurável;
 - respostas de login e endpoints de sessão usam <code>Cache-Control: no-store</code>.
+- nomes públicos são normalizados para comparação, não podem se repetir e podem ter até 80 caracteres;
+- fotos podem ser armazenadas como imagem enviada em formato de dados ou URL HTTP/HTTPS; uploads são reduzidos para até 512 KB antes do envio pela interface.
 
 ## Bridge entre aplicações
+
+Para usar o frontend em um iframe, adicione a origem da aplicação pai em
+<code>FRAME_ANCESTORS</code> e mantenha essa origem em
+<code>VITE_AUTH_RETURN_ORIGINS</code>. Quando o login terminar, o frontend envia
+<code>AUTH_SERVICE/AUTHENTICATED</code> ao pai; a aplicação pai deve validar a
+origem e navegar para o destino que ela mesma controlava. Se o pai também
+precisar do token curto do bridge, configure <code>VITE_AUTH_BRIDGE_ORIGINS</code>.
 
 O frontend pode entregar um token curto a uma aplicação pai dentro de um <code>iframe</code>. Configure as origens exatas antes do build:
 

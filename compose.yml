@@ -8,6 +8,7 @@ services:
                 NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}
                 GO_IMAGE: ${GO_IMAGE:-golang:1.26-alpine}
                 RUNTIME_IMAGE: ${RUNTIME_IMAGE:-alpine:3.21}
+                VITE_AUTH_RETURN_ORIGINS: ${VITE_AUTH_RETURN_ORIGINS:-}
         container_name: auth-service
         restart: unless-stopped
         env_file:

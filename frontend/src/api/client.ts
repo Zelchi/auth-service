@@ -1,11 +1,33 @@
 const BASE = '/api'
 
+export interface AuthenticatedUser {
+    id: string
+    email: string
+    name: string
+    image: string
+    created_at: string
+}
+
 const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
-    const res = await fetch(`${BASE}${path}`, {
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        ...options,
-    })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000)
+    let res: Response
+
+    try {
+        res = await fetch(`${BASE}${path}`, {
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            ...options,
+            signal: controller.signal,
+        })
+    } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') {
+            throw new Error('O serviço de autenticação demorou para responder.')
+        }
+        throw error
+    } finally {
+        clearTimeout(timeout)
+    }
 
     const raw = await res.text()
     let data: unknown = null
@@ -53,5 +75,10 @@ export default {
         method: 'POST',
     }),
 
-    me: () => request<{ id: string; email: string; created_at: string }>('/me'),
+    me: () => request<AuthenticatedUser>('/me'),
+
+    updateProfile: (name: string, image: string) => request<AuthenticatedUser>('/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ name, image }),
+    }),
 }

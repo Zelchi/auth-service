@@ -3,20 +3,13 @@ package database
 import (
 	"context"
 	"database/sql"
-	"embed"
-	"errors"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
-
-//go:embed migrations/*.sql
-var migrations embed.FS
 
 var DB *sql.DB
 
@@ -46,73 +39,32 @@ func Connect() {
 		log.Fatalf("erro ao configurar WAL: %v", err)
 	}
 
-	if err := applyMigrations(); err != nil {
-		log.Fatalf("erro ao executar migrations: %v", err)
+	if err := initializeSchema(ctx); err != nil {
+		log.Fatalf("erro ao inicializar schema: %v", err)
 	}
 
 	fmt.Println("✓ Banco de dados conectado")
 }
 
-func applyMigrations() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func initializeSchema(ctx context.Context) error {
 	if _, err := DB.ExecContext(ctx, `
-		CREATE TABLE IF NOT EXISTS schema_migrations (
-			version    TEXT PRIMARY KEY,
-			applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		CREATE TABLE IF NOT EXISTS users (
+			id              TEXT PRIMARY KEY,
+			email           TEXT NOT NULL UNIQUE,
+			password        TEXT NOT NULL,
+			name            TEXT NOT NULL DEFAULT '',
+			image           TEXT NOT NULL DEFAULT '',
+			name_normalized TEXT NOT NULL DEFAULT '',
+			created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)
 	`); err != nil {
 		return err
 	}
 
-	entries, err := migrations.ReadDir("migrations")
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
-		}
-
-		var applied int
-		err := DB.QueryRowContext(ctx,
-			`SELECT 1 FROM schema_migrations WHERE version = ?`,
-			entry.Name(),
-		).Scan(&applied)
-		if err == nil {
-			continue
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-
-		script, err := fs.ReadFile(migrations, "migrations/"+entry.Name())
-		if err != nil {
-			return err
-		}
-
-		tx, err := DB.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-
-		if _, err = tx.ExecContext(ctx, string(script)); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("%s: %w", entry.Name(), err)
-		}
-		if _, err = tx.ExecContext(ctx,
-			`INSERT INTO schema_migrations (version) VALUES (?)`,
-			entry.Name(),
-		); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("registrar %s: %w", entry.Name(), err)
-		}
-		if err = tx.Commit(); err != nil {
-			return fmt.Errorf("confirmar %s: %w", entry.Name(), err)
-		}
-	}
-
-	return nil
+	_, err := DB.ExecContext(ctx, `
+		CREATE UNIQUE INDEX IF NOT EXISTS users_name_normalized_unique
+		ON users(name_normalized)
+		WHERE name_normalized <> ''
+	`)
+	return err
 }

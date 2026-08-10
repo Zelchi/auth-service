@@ -28,6 +28,9 @@ func testUsersDB(t *testing.T) *sql.DB {
 			id TEXT PRIMARY KEY,
 			email TEXT NOT NULL UNIQUE,
 			password TEXT NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			image TEXT NOT NULL DEFAULT '',
+			name_normalized TEXT NOT NULL DEFAULT '',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)
 	`); err != nil {
@@ -94,6 +97,60 @@ func TestMeReturnsAuthenticatedUser(t *testing.T) {
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+}
+
+func TestUpdateMeStoresProfile(t *testing.T) {
+	db := testUsersDB(t)
+	t.Cleanup(func() { _ = db.Close() })
+	previousDB := database.DB
+	database.DB = db
+	t.Cleanup(func() { database.DB = previousDB })
+	if _, err := db.Exec(`INSERT INTO users (id, email, password) VALUES (?, ?, ?)`, "user-123", "user@example.com", "hash"); err != nil {
+		t.Fatalf("insert user error = %v", err)
+	}
+
+	ctx := context.WithValue(context.Background(), middleware.UserIDKey, "user-123")
+	req := httptest.NewRequest(http.MethodPatch, "/api/me", strings.NewReader(`{"name":"Ana Lima","image":"data:image/png;base64,YQ=="}`)).WithContext(ctx)
+	req.Host = "example.com"
+	req.Header.Set("Origin", "https://example.com")
+	recorder := httptest.NewRecorder()
+	Me(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	var name, normalized, image string
+	if err := db.QueryRow(`SELECT name, name_normalized, image FROM users WHERE id = ?`, "user-123").Scan(&name, &normalized, &image); err != nil {
+		t.Fatalf("profile query error = %v", err)
+	}
+	if name != "Ana Lima" || normalized != "ana lima" || image == "" {
+		t.Fatalf("stored profile = %q/%q/%q", name, normalized, image)
+	}
+}
+
+func TestUpdateMeRejectsDuplicateName(t *testing.T) {
+	db := testUsersDB(t)
+	t.Cleanup(func() { _ = db.Close() })
+	previousDB := database.DB
+	database.DB = db
+	t.Cleanup(func() { database.DB = previousDB })
+	if _, err := db.Exec(`INSERT INTO users (id, email, password, name, name_normalized) VALUES (?, ?, ?, ?, ?)`, "user-1", "one@example.com", "hash", "Ana Lima", "ana lima"); err != nil {
+		t.Fatalf("insert first user error = %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO users (id, email, password) VALUES (?, ?, ?)`, "user-2", "two@example.com", "hash"); err != nil {
+		t.Fatalf("insert second user error = %v", err)
+	}
+
+	ctx := context.WithValue(context.Background(), middleware.UserIDKey, "user-2")
+	req := httptest.NewRequest(http.MethodPatch, "/api/me", strings.NewReader(`{"name":" ana   lima ","image":""}`)).WithContext(ctx)
+	req.Host = "example.com"
+	req.Header.Set("Origin", "https://example.com")
+	recorder := httptest.NewRecorder()
+	Me(recorder, req)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusConflict)
 	}
 }
 

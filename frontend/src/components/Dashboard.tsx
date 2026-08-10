@@ -19,7 +19,7 @@ const ProfileCard = styled('div')`
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 16px;
-    box-shadow: 0 16px 40px rgba(16, 24, 40, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
     padding: 24px;
     width: 100%;
     max-width: 380px;
@@ -39,10 +39,6 @@ const Avatar = styled('div')`
     font-size: 22px;
     font-weight: 700;
     color: var(--bg);
-
-    @media (prefers-color-scheme: light) {
-        color: #fff;
-    }
 `
 
 const Field = styled('div')`
@@ -69,14 +65,14 @@ interface Props {
 
 export default (props: Props) => {
     const [user] = createResource(() => API.me())
-	let redirected = false
+    let redirected = false
 
-	createEffect(() => {
-		if (user.error && !redirected) {
-			redirected = true
-			props.onLogout()
-		}
-	})
+    createEffect(() => {
+        if (user.error && !redirected) {
+            redirected = true
+            props.onLogout()
+        }
+    })
 
     const logout = async () => {
         try {

@@ -25,16 +25,13 @@ export const Button = styled('button') <{ loading?: boolean }>`
         transform: translateY(-1px);
     }
     &:active { transform: translateY(0); }
-    @media (prefers-color-scheme: light) {
-        color: #fff;
-    }
 `
 
 export const Card = styled('div')`
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 16px;
-    box-shadow: 0 16px 40px rgba(16, 24, 40, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
     padding: 28px 24px;
     width: 100%;
     max-width: 380px;
@@ -49,7 +46,7 @@ export const Card = styled('div')`
 `
 
 export const Center = styled('div')`
-    background: var(--bg);
+    background: #121212;
     min-height: 100dvh;
     width: 100%;
     display: flex;

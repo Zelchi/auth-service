@@ -15,7 +15,7 @@ const InputEl = styled('input')`
 
     &:focus {
         border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(74, 94, 133, 0.14);
+        box-shadow: 0 0 0 3px rgba(236, 236, 236, 0.14);
     }
 
     &::placeholder {

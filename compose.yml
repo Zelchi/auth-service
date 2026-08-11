@@ -10,7 +10,6 @@ services:
                 RUNTIME_IMAGE: ${RUNTIME_IMAGE:-alpine:3.21}
                 VITE_AUTH_RETURN_ORIGINS: ${VITE_AUTH_RETURN_ORIGINS:-}
         container_name: auth-service
-        restart: unless-stopped
         env_file:
             - .env
         ports:

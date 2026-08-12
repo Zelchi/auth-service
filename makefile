@@ -1,32 +1,49 @@
 SHELL := /bin/sh
 
-.PHONY: dev build start clean
+.PHONY: help install dev dev-backend dev-frontend typecheck build check start preview clean
 
-dev:
-	@if [ ! -f backend/cmd/dist/index.html ]; then \
-		$(MAKE) build; \
-	fi
-	@set -e; \
-	backend_pid=; frontend_pid=; \
-	cleanup() { \
-		[ -z "$$backend_pid" ] || pkill -TERM -P "$$backend_pid" 2>/dev/null || true; \
-		[ -z "$$frontend_pid" ] || pkill -TERM -P "$$frontend_pid" 2>/dev/null || true; \
-		[ -z "$$backend_pid" ] || kill -TERM "$$backend_pid" 2>/dev/null || true; \
-		[ -z "$$frontend_pid" ] || kill -TERM "$$frontend_pid" 2>/dev/null || true; \
-	}; \
-	trap cleanup INT TERM EXIT; \
-	(cd backend && go run ./cmd/main.go) & backend_pid=$$!; \
-	(cd frontend && yarn dev --configLoader runner --host 127.0.0.1 --port 5173 --strictPort) & frontend_pid=$$!; \
-	wait $$backend_pid $$frontend_pid
+help:
+	@printf '%s\n' \
+		'make install    Instala as dependências do frontend e backend' \
+		'make dev        Inicia o backend e o frontend de desenvolvimento' \
+		'make typecheck  Verifica os tipos do frontend e backend' \
+		'make build      Gera o build de produção' \
+		'make check      Executa typecheck e build' \
+		'make start      Inicia o build de produção existente' \
+		'make preview    Inicia o preview do frontend' \
+		'make clean      Remove apenas os artefatos gerados'
+
+install:
+	yarn --cwd frontend install
+	go -C backend mod download
+
+dev: build
+	+$(MAKE) --jobs=2 dev-backend dev-frontend
+
+dev-backend:
+	go -C backend run ./cmd/main.go
+
+dev-frontend:
+	yarn --cwd frontend dev --configLoader runner --host 127.0.0.1 --port 5173 --strictPort
+
+typecheck:
+	yarn --cwd frontend tsc -b
+	go -C backend vet ./...
 
 build:
-	cd frontend && yarn build
+	yarn --cwd frontend build
 	rm -rf backend/cmd/dist
 	cp -r frontend/dist backend/cmd/dist
-	cd backend && go build -ldflags="-s -w" -o ./bin/server ./cmd/main.go
+	mkdir -p backend/bin
+	go -C backend build -ldflags="-s -w" -o ./bin/server ./cmd/main.go
 
-start: build
-	cd backend && go run ./cmd/main.go
+check: typecheck build
+
+start:
+	cd backend && ./bin/server
+
+preview:
+	yarn --cwd frontend preview
 
 clean:
 	rm -rf frontend/dist backend/cmd/dist backend/bin
